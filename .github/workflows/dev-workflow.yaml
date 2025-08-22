@@ -1,24 +1,17 @@
-name: Terraform Dev Deployment
+name: Terraform CI/CD
 
 on:
+  workflow_dispatch:   # allows manual trigger
   push:
     branches:
-      - dev
-  workflow_dispatch:   
+      - main
 
 jobs:
   terraform:
-    name: Terraform Plan and Apply
+    name: Terraform Plan
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      id-token: write
-      pull-requests: write
-
     defaults:
       run:
-        shell: bash
         working-directory: ./envs/dev   
 
     steps:
@@ -28,38 +21,43 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.9.5   
+          terraform_version: 1.9.5   # choose the version you want
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
 
       - name: Terraform Init
         run: terraform init
 
+      - name: Terraform Format
+        run: terraform fmt -check
+
+      - name: Terraform Validate
+        run: terraform validate
+
       - name: Terraform Plan
+        id: plan
         run: terraform plan -out=tfplan
 
-      - name: Upload Plan Artifact
+      - name: Upload Terraform Plan Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tf-plan
-          path: ./dev/tfplan
+          name: tfplan
+          path: ./envs/dev/tfplan
 
-  manual_approval:
-    name: Wait for Approval
+  apply:
+    name: Terraform Apply (Manual Approval Required)
     needs: terraform
     runs-on: ubuntu-latest
     environment:
-      name: dev
-      url: https://console.aws.amazon.com   
-    steps:
-      - name: Approval Step
-        run: echo "Waiting for approval before apply"
-
-  terraform_apply:
-    name: Terraform Apply
-    needs: manual_approval
-    runs-on: ubuntu-latest
+      name: production
+      url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
     defaults:
       run:
-        shell: bash
         working-directory: ./envs/dev
 
     steps:
@@ -71,14 +69,21 @@ jobs:
         with:
           terraform_version: 1.9.5
 
-      - name: Terraform Init
-        run: terraform init
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
 
-      - name: Download Plan Artifact
+      - name: Download Terraform Plan Artifact
         uses: actions/download-artifact@v4
         with:
-          name: tf-plan
+          name: tfplan
           path: ./envs/dev
+
+      - name: Terraform Init
+        run: terraform init
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
