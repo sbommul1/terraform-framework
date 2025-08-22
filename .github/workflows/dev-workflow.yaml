@@ -15,13 +15,11 @@ jobs:
         working-directory: ./envs/dev   
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
+      - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.9.5   # choose the version you want
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
