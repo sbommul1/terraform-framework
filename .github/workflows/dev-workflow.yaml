@@ -82,6 +82,9 @@ jobs:
       - name: Terraform Init
         run: terraform init
         
+      - name: Terraform Init (Reconfigure)
+        run: terraform init -reconfigure -input=false
+        
       - name: terraform plan -destroy -out=tfplan
         run: terraform apply "tfplan"
         
